@@ -1,0 +1,264 @@
+<!doctype html>
+<html>
+
+<head>
+    <title>Golang!</title>
+    <script src="static/Chart.min.js"></script>
+    <script src="static/utils.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.10.2/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="static/style.css">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+    <style>
+        canvas {
+            -moz-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <form class="form-inline my-2 my-lg-0">
+            <img src="cpu.png" height="50" width="50" >
+    
+            <!--- <a class="navbar-brand" href="#"> Monitor del sistema</a> 
+            --->
+      
+          </form>
+
+     
+      
+      
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <ul class="navbar-nav mr-auto">
+            <li class="nav-item active">
+              <a class="nav-link" href="principal.html">Pagina Principal <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item active">
+              <a class="nav-link" href="monitorcpu.html">Monitor de CPU</a>
+            </li>
+          
+            <li class="nav-item active">
+              <a class="nav-link" href="monitormemoria.html">Monitor de RAM</a>
+            </li>
+          </ul>
+        
+        </div>
+    </nav>
+    <div class='canvas-container' style='width:75%;'>
+    </br>
+        <h2>MONITOR DE PROCESOS</h2>
+    </div>
+  
+    <div class="container">
+    <table class="table table-striped table-dark" >
+        <tr>
+            <td class="active">Procesos en ejecucion:</td><td><input  id="ejecucion" name="ejecucion" type="text" size="20"></input></td>
+        </tr>
+        <tr>
+            <td>Procesos suspendidos:</td><td><input  id="suspendidos" name="suspendidos" type="text" size="20"></input></td>
+        </tr>
+        <tr>
+            <td>Procesos detenidos:</td><td><input  id="detenidos" name="detenidos" type="text" size="20"></input</td>
+        </tr>
+        <tr>
+            <td>Procesos zombies:</td><td><input  id="zombies" name="zombies" type="text" size="20"></input></td>
+        </tr>
+        <tr>
+            <td>Procesos totales:</td><td><input  id="total" name="total" type="text" size="20"></input></td>
+        </tr>
+    </table> 
+</div>
+
+    <br>
+    <div class="container">
+    <div id="tablaprocesos" ></div>
+</div>
+    <br>
+    <div class="container">
+    <h2>Arbol dinamico:</h2></br>
+    <div id="arbolprocesos" style=" margin: 10px 0 0 100px; color:red;" ></div>
+</div>
+    <br>
+    <br>
+    <script>
+    var textoanterior="";
+    function changeDisplay (id) {
+      e=document.getElementById("hijos"+id);
+      t=document.getElementById("texto"+id);
+      if (e.style.display == 'none' || e.style.display == "") {
+        e.style.display = 'block';
+        t.style.color="black";
+      } else {
+        e.style.display = 'none';
+        t.style.color="red";
+      }
+    }
+    function checkTime(i)
+
+    {if (i<10) {i="0" + i;}return i;}
+
+        setInterval(function() {
+                //window.location.reload(1);
+                $.ajax({
+            url: "http://localhost:3030/principal"
+        }).then(function(data) {            
+            $('#ejecucion').val(data.ejecucion);            
+            $('#suspendidos').val(data.suspendidos);
+            $('#detenidos').val(data.detenidos);
+            $('#zombies').val(data.zombie);
+            $('#total').val(data.total);  
+            //console.log("El valor total es de: "+document.getElementById('total').value )
+            let datos= data.datos;
+            let arbol=data.arbol;
+            //console.log("Todos los datos:\n "+datos )
+            let splitsalto=datos.split("\n");
+            let tabla="<center><table  class=\"table table-striped table-dark\"  border=\"1\" >\n<tr>\n<td>PID</td>\n<td>NOMBRE</td>\n<td>ESTADO</td>\n<td>USUARIO</td>\n<td>% RAM</td>\n<td>KILL</td>\n</tr>";
+            for(let i=0;i<splitsalto.length-1;i++){
+                tabla+="<tr>\n"
+                let splitcoma=splitsalto[i].split(",");
+                for(let j=0;j<splitcoma.length;j++){
+                    tabla+="<td>\n"
+                    tabla+=splitcoma[j];
+                    tabla+="\n</td>"
+                }
+                tabla+="<td>";
+                tabla+="<input class=\"btn btn-danger\" type=\"button\" value=\"KILL\" onclick=\"javascript:enviardatos('"+splitcoma[0]+"')\" name=\""+splitcoma[0]+"\"/></td>"
+                tabla+="</tr>\n"
+            }
+            tabla+="</table></center>\n"
+            document.getElementById("tablaprocesos").innerHTML=tabla;
+            //CREANDO ESTRUCTURA DE ARBOL
+            if(textoanterior==arbol){
+                console.log("El texto es el mismo que el anterior");
+                return;
+            }else{
+                textoanterior=arbol;    
+            }
+            let splitsaltoarbol=arbol.split("\n");
+            var h=new Object();
+            //var objhijo={id:"",nombre:""}
+            //var objpadre={id:"",hijos:[]}
+            for(let i=0;i<splitsaltoarbol.length-1;i++){
+                let splitcomaarbol=splitsaltoarbol[i].split(",");
+                //primera posicion es el padre
+                //las demas posiciones son los hijos (id:nombre)
+                if(h[splitcomaarbol[0]]===undefined){
+                    //SI NO EXISTE ESTE PADRE
+                    var objpadre={id:splitcomaarbol[0],hijos:[]}
+                    h[splitcomaarbol[0]]=objpadre;
+                }
+                for(let j=1;j<splitcomaarbol.length;j++){
+                    let splitpuntos=splitcomaarbol[j].split(":");
+                    var objhijo={id:splitpuntos[0],nombre:splitpuntos[1]}
+                    h[splitcomaarbol[0]]["hijos"].push(objhijo);
+                }
+            }
+            //tengo en h todos los padres
+            let textoarbol="<div \"style=\"margin: 10px 0 0 10px;\">\n";
+            //let textoarbol="<table \"style=\"margin: 10px 0 0 10px;\">\n"
+            //textoarbol+=escribirarbol(h,h["1"]);
+            
+            //console.log("La primera posicion tiene: "+h["1"]["hijos"].length+" hijos");
+            //console.log("las keys son: "+h.keys());
+            cont=10;
+            for(let i in h){
+                if(h[i]===undefined){
+
+                }else{
+                    //SI TIENE ALGO 
+                    textoarbol+=escribirarbol(h,h[i],cont);
+                    cont+=10;
+                }
+            }
+            textoarbol+="</div>"
+            //textoarbol+="</table>"
+            document.getElementById("arbolprocesos").innerHTML=textoarbol;
+            /**
+            <div style="margin: 10px 0 0 10px;">
+                <a id="extra" href="javascript:changeDisplay('detalles')">
+                    Mostrar
+                </a>
+                <div id="detalles" style="display:none; margin: 0 0 0 20px;">
+                    <a id="extra" href="javascript:changeDisplay('detalles2')">
+                        Texto adicional que sólo se muestra cuando así lo desea el usuario...
+                    </a>
+                    <div id="detalles2" style="display:none; margin: 0 0 0 20px;">
+                        Texto numero 2
+                    </div>
+                </div>
+            </div>
+            */
+            });
+            
+        },1000);
+        function escribirarbol(arbol,padre,cont){
+            let texto="";
+            if(padre===undefined){
+                //console.log("Encontro indefinidos\n"); NO SON PADRES, SOLO HIJOS
+            }else{
+                //SI TIENE ALGO 
+                //textoarbol+=escribirarbol(h,h[i]);
+                texto+="<a id = \"texto"+padre["id"]+"\"href=\"javascript:changeDisplay('"+padre["id"]+"')\"style=\"margin: "+cont+"px 0 0 25px; color: red; font-style: italic;border: solid red;font-size: 20pt;\">"+padre["id"]+"\n</a></br>"
+                texto+="<div id=\"hijos"+padre["id"]+"\" style=\"display:none; margin: 10px 0 0 25px; color:red;\">\n"
+               // for(let i in padre["hijos"]){
+                  //  texto+="<a href=\"javascript:changeDisplay('"+i["id"]+"')\">"+i["id"]+":"+i["nombre"]+"\n</a>"
+               //     texto+=escribirarbol(arbol,arbol[i["id"]]);
+               // }
+                //console.log("Haciendo padre con "+padre["hijos"].length+" hijos\n");
+                for(let i=0;i<padre["hijos"].length;i++){
+                    //texto+="<a href=\"javascript:changeDisplay('"+padre["hijos"][i]["id"]+"')\">"+padre["hijos"][i]["id"]+":"+padre["hijos"][i]["nombre"]+"\n</a>"
+                    //texto+=
+                    if(arbol[padre["hijos"][i]["id"]]===undefined){
+                        texto+="<a id = \"texto"+padre["hijos"][i]["id"]+"\"style=\"margin: "+(i*30)+"px 0 0 25px;color: black; font-style: italic;border: solid black;font-size: 20pt;\">id: "+padre["hijos"][i]["id"]+" nombre: "+padre["hijos"][i]["nombre"]+"\n</a></br>"
+                    }else{
+                        texto+=escribirarbol(arbol,arbol[padre["hijos"][i]["id"]],(i*30));
+                        arbol[padre["hijos"][i]["id"]]=undefined;
+                    }
+                    
+                }
+                
+                texto+="</div>"
+            }
+            return texto;
+        }
+        function enviardatos(id){
+            var request = new XMLHttpRequest();
+            request.open('POST', 'http://localhost:3030/post', true);
+            request.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+
+            var data = {hat: id};
+            request.send(JSON.stringify(data));
+        }
+        window.onload = function() {
+        };
+        /* PARA AGREGAR LOS BOTONES
+        <script type="text/javascript">
+  function changeLink (id, url) {
+    document.getElementById(id).innerHTML = "Visitar "+url;
+    document.getElementById(id).href = url;
+  }
+
+<a id="enlace" target="_blank" href="#">Visitar ???</a>
+
+<input type="button" 
+       onclick="changeLink('enlace', 'www.google.com')" 
+       value="Google" />
+
+       FORMULARIO
+        <form name="formulario" 
+        action="mailto:micorreo@midominio.com"
+        onsubmit="return validar()">
+    Nombre: <input type="text" id="nombre" size="20" /> <br />
+    E-mail: <input type="text" id="email" size="20" /> <br />
+    <br />
+    <input type="submit" value="Enviar" />
+    </form>
+        */
+
+    </script>    
+</body>
+</html>
